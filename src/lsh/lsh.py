@@ -1,49 +1,59 @@
 import numpy as np
 from collections import defaultdict
 
-
 def build_lsh_index(signatures: np.ndarray, b: int, r: int):
-    k, n = signatures.shape
-    if k != b * r:
-        raise ValueError(f"k={k} but b*r={b*r}")
-    tables = [defaultdict(list) for _ in range(b)]
-    for j in range(n):
-        for band in range(b):
-            s = band * r
-            e = s + r
-            key = signatures[s:e, j].tobytes()
-            tables[band][key].append(j)
-    return tables
+    k, N = signatures.shape
+    assert k == b * r, f"k must equal b * r, got k={k}, b*r={b*r}"
+
+    band_hash_tables = [defaultdict(list) for _ in range(b)]
+
+    for doc_idx in range(N):
+        for band_idx in range(b):
+            start = band_idx * r
+            end = start + r
+            band_slice = signatures[start:end, doc_idx]
+            band_bytes = band_slice.tobytes()
+            band_hash_tables[band_idx][band_bytes].append(doc_idx)
+
+    return band_hash_tables
 
 
 def generate_all_candidate_pairs(band_hash_tables):
-    seen = set()
-    for table in band_hash_tables:
-        for idxs in table.values():
-            if len(idxs) < 2:
+    seen_pairs = set()
+
+    for band_table in band_hash_tables:
+        for bucket_docs in band_table.values():
+            if len(bucket_docs) < 2:
                 continue
-            idxs = sorted(idxs)
-            for i in range(len(idxs)):
-                for j in range(i + 1, len(idxs)):
-                    pair = (idxs[i], idxs[j])
-                    if pair not in seen:
-                        seen.add(pair)
+            bucket_docs = sorted(bucket_docs)
+            for i_idx in range(len(bucket_docs)):
+                for j_idx in range(i_idx + 1, len(bucket_docs)):
+                    pair = (bucket_docs[i_idx], bucket_docs[j_idx])
+                    if pair not in seen_pairs:
+                        seen_pairs.add(pair)
                         yield pair
 
 
 def lsh_for_brand_block(offer_ids, signatures, b, r):
-    k, n = signatures.shape
-    if k != b * r:
-        raise ValueError(f"k={k} but b*r={b*r}")
-    tables = build_lsh_index(signatures, b=b, r=r)
-    idx_pairs = list(generate_all_candidate_pairs(tables))
+    k, N = signatures.shape
+    assert k == b * r, f"k must equal b * r, got k={k}, b*r={b*r}"
+
+    band_hash_tables = build_lsh_index(signatures, b=b, r=r)
+    idx_pairs = list(generate_all_candidate_pairs(band_hash_tables))
+
     pairs_offer_ids = [(offer_ids[i], offer_ids[j]) for (i, j) in idx_pairs]
-    doc_to_cand = {oid: set() for oid in offer_ids}
+
+    doc_to_cand_indices = {i: set() for i in range(N)}
     for i, j in idx_pairs:
-        oi, oj = offer_ids[i], offer_ids[j]
-        doc_to_cand[oi].add(oj)
-        doc_to_cand[oj].add(oi)
-    return pairs_offer_ids, doc_to_cand
+        doc_to_cand_indices[i].add(j)
+        doc_to_cand_indices[j].add(i)
+
+    doc_to_cand_offers = {
+        offer_ids[i]: {offer_ids[j] for j in cand_idxs}
+        for i, cand_idxs in doc_to_cand_indices.items()
+    }
+
+    return pairs_offer_ids, doc_to_cand_offers
 
 
 def factor_pairs(n: int):
@@ -56,17 +66,18 @@ def factor_pairs(n: int):
                 pairs.append((r, b))
     return sorted(pairs)
 
+
 def run_lsh_for_all_brands(brand_signatures, b, r):
     brand_lsh_candidates = {}
 
     for brand, (offer_ids, signatures) in brand_signatures.items():
-        k, n = signatures.shape
-        if n < 2:
-            # Nothing to compare for this brand
+        k, N = signatures.shape
+        if N < 2:
             continue
-
         if k != b * r:
-            raise ValueError(f"LSH config mismatch for brand '{brand}': k={k} but b*r={b*r}")
+            raise ValueError(
+                f"LSH config mismatch for brand '{brand}': k={k}, b*r={b*r}"
+            )
 
         pairs_offer_ids, _ = lsh_for_brand_block(offer_ids, signatures, b, r)
         brand_lsh_candidates[brand] = pairs_offer_ids

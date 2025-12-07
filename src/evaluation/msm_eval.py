@@ -1,8 +1,7 @@
-# src/evaluation/msm_eval.py
 from collections import defaultdict
 from itertools import product
 
-from msm.msm import msm_for_all_brands, clusters_to_pairs_by_brand  # adjust import path
+from msm.msm import msm_for_all_brands, clusters_to_pairs_by_brand
 
 
 def get_model_id(offer_id, data):
@@ -56,12 +55,9 @@ def evaluate_predicted_pairs(predicted_pairs, data, allowed_cluster_ids=None):
     FN = len(FN_set)
 
     precision = TP / (TP + FP) if (TP + FP) > 0 else 0.0
-    recall = TP / (TP + FN) if (TP + FN) > 0 else 0.0
-    F1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+    recall    = TP / (TP + FN) if (TP + FN) > 0 else 0.0
+    F1        = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
 
-    PQ = precision
-    PC = recall
-    F1_star = F1
 
     return {
         "TP": TP,
@@ -71,12 +67,8 @@ def evaluate_predicted_pairs(predicted_pairs, data, allowed_cluster_ids=None):
         "n_pred_pairs": len(pred_set),
         "precision": precision,
         "recall": recall,
-        "F1": F1,
-        "PQ": PQ,
-        "PC": PC,
-        "F1*": F1_star,
+        "F1": F1
     }
-
 
 def run_msm_and_evaluate(brand_candidates, data, gamma, epsilon, mu, alpha, brands, allowed_cluster_ids=None):
     clusters_by_brand, _ = msm_for_all_brands(
@@ -95,7 +87,6 @@ def run_msm_and_evaluate(brand_candidates, data, gamma, epsilon, mu, alpha, bran
         allowed_cluster_ids=allowed_cluster_ids,
     )
     return metrics
-
 
 def tune_msm_params(
     brand_candidates,
@@ -141,4 +132,4 @@ def tune_msm_params(
             best_params = {"gamma": gamma, "epsilon": epsilon, "mu": mu, "alpha": alpha}
             best_metrics = metrics
 
-    return best_params, best_metrics
+    return best_params, best_metrics 

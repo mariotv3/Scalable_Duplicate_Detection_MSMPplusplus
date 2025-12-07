@@ -309,13 +309,6 @@ def prepare_datasets(raw_data, seed=None):
     }
 
 def run(data):
-    """
-    High-level preprocessing:
-      - annotate brands
-      - clean titles/features
-      - bootstrap split by clusters
-      - build brand lists
-    """
     data = annotate_offers_with_brand(copy.deepcopy(data))
 
     cleaned_dups, cleaned_single = clean_data_optimized(data)

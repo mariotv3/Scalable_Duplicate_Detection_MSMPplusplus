@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple, Iterable, Set
 import numpy as np
 
 NUMERIC_PREFIX = re.compile(r"^\d+(?:\.\d+)?")
-PRIME_32 = np.uint32(4294967291)
+PRIME_32 = 4294967291
 
 
 def augment_with_numeric_parts(tokens: Iterable[str]) -> Set[str]:
@@ -24,8 +24,10 @@ def extract_shingles_for_offer(offer: dict) -> Set[str]:
     return mw | feat
 
 
-def shingles_to_ints_local(shingles: Iterable[str],
-                           shingle_to_id: Dict[str, int]) -> Set[int]:
+def shingles_to_ints_local(
+    shingles: Iterable[str],
+    shingle_to_id: Dict[str, int],
+) -> Set[int]:
     out = set()
     for s in shingles:
         if s not in shingle_to_id:
@@ -34,20 +36,27 @@ def shingles_to_ints_local(shingles: Iterable[str],
     return out
 
 
-def compute_minhash_signature(shingle_ids: Iterable[int],
-                              A: np.ndarray,
-                              B: np.ndarray,
-                              P: np.int32) -> np.ndarray:
+def compute_minhash_signature(
+    shingle_ids: Iterable[int],
+    A: np.ndarray,
+    B: np.ndarray,
+    P: int,                 
+) -> np.ndarray:
     num_perm = A.shape[0]
-    sig = np.full(num_perm, P, dtype=np.int32)
+
+    sig = np.full(num_perm, P, dtype=np.uint32)
+
     shingle_ids = list(shingle_ids)
     if not shingle_ids:
         return sig
+
     for x in shingle_ids:
         x = np.uint32(x)
-        hx = (A + B * x) % P
+        hx = (A.astype(np.uint64) + B.astype(np.uint64) * x) % np.uint64(P)
+        hx = hx.astype(np.uint32)
         sig = np.minimum(sig, hx)
-    return sig.astype(np.uint32)
+
+    return sig
 
 
 def process_brand_block(
@@ -55,7 +64,7 @@ def process_brand_block(
     num_perm: int,
     A: np.ndarray,
     B: np.ndarray,
-    P: np.uint32,
+    P: int,
 ) -> Tuple[List[str], np.ndarray]:
     shingle_to_id: Dict[str, int] = {}
     product_shingle_sets: Dict[str, Set[int]] = {}
@@ -74,7 +83,7 @@ def process_brand_block(
         sigs[:, j] = compute_minhash_signature(
             product_shingle_sets[oid], A, B, P
         )
-
+    
     return offer_ids, sigs
 
 
@@ -96,7 +105,10 @@ def build_minhash_for_brands(
         if n < min_offers_for_lsh:
             small_brand_offers[brand] = items
             continue
-        offer_ids, sigs = process_brand_block(items, num_perm, A, B, PRIME_32)
+
+        offer_ids, sigs = process_brand_block(
+            items, num_perm, A, B, PRIME_32
+        )
         brand_signatures[brand] = (offer_ids, sigs)
 
     params = {"NUM_PERM": num_perm, "P": PRIME_32, "A": A, "B": B}

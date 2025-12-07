@@ -23,17 +23,17 @@ def evaluate_lsh_pairs_for_brand(pairs_offer_ids, offer_ids, data):
             true_overall += 1
 
     return {
-        "lsh_true_pairs": tp,
+        "lsh_true_pairs": tp,              
         "total_possible_pairs": total_possible,
-        "true_pairs_overall": true_overall,
+        "true_pairs_overall": true_overall 
     }
 
 
 def evaluate_lsh_global(brand_signatures, data, b, r):
-    total_tp = 0
-    total_true = 0
-    total_cand = 0
-    total_possible = 0
+    total_tp = 0          
+    total_true = 0         
+    total_cand = 0         
+    total_possible = 0     
 
     for _, (offer_ids, sigs) in brand_signatures.items():
         k, n = sigs.shape
@@ -42,19 +42,25 @@ def evaluate_lsh_global(brand_signatures, data, b, r):
         if k != b * r:
             raise ValueError(f"k={k} but b*r={b*r}")
         pairs, _ = lsh_for_brand_block(offer_ids, sigs, b, r)
-        m = evaluate_lsh_pairs_for_brand(pairs_offer_ids=pairs,
-                                         offer_ids=offer_ids,
-                                         data=data)
+
+        m = evaluate_lsh_pairs_for_brand(
+            pairs_offer_ids=pairs,
+            offer_ids=offer_ids,
+            data=data
+        )
+
         total_tp += m["lsh_true_pairs"]
         total_true += m["true_pairs_overall"]
         total_possible += m["total_possible_pairs"]
         total_cand += len(pairs)
 
-    PC = total_tp / total_true if total_true else 0.0
-    PQ = total_tp / total_cand if total_cand else 0.0
-    FC = total_cand / total_possible if total_possible else 0.0
-    F1 = 2 * PQ * PC / (PQ + PC) if (PQ + PC) else 0.0
-    F1_star = F1 / FC if FC else 0.0
+    PC = total_tp / total_true if total_true else 0.0     
+    PQ = total_tp / total_cand if total_cand else 0.0    
+    FC = total_cand / total_possible if total_possible else 0.0  
+
+    F1_star = 2 * PQ * PC / (PQ + PC) if (PQ + PC) else 0.0
+
+    print(f"(b,r): ({b},{r}), FC: {FC}, PC: {PC}, PQ: {PQ}")
 
     return {
         "TP": total_tp,
@@ -64,7 +70,6 @@ def evaluate_lsh_global(brand_signatures, data, b, r):
         "PQ": PQ,
         "PC": PC,
         "FC": FC,
-        "F1": F1,
         "F1*": F1_star,
     }
 
@@ -78,6 +83,7 @@ def tune_lsh_parameters(brand_signatures, data, num_perm, max_FC=0.8):
         if b * r != num_perm:
             continue
         m = evaluate_lsh_global(brand_signatures, data, b, r)
+
         if m["FC"] < max_FC and m["PC"] > best_PC:
             best_PC = m["PC"]
             best_params = (b, r)
