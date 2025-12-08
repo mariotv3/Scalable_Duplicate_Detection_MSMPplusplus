@@ -82,15 +82,18 @@ def run_single_bootstrap(raw_data,
 
     # --- 3. MSM tuning on TRAIN ---
     best_msm_params, best_msm_metrics = tune_msm_params(
-        brand_candidates=brand_candidates_train,
-        data=cleaned_data,
-        brands=known_brands,
-        train_cluster_ids=train_clusters,
-        gamma_values=gamma_grid,
-        epsilon_values=epsilon_grid,
-        mu_values=mu_grid,
-        alpha_values=alpha_grid,
-    )
+    brand_candidates=brand_candidates_train,
+    data=cleaned_data,
+    brands=known_brands,
+    train_cluster_ids=train_clusters,
+    n_trials=30, 
+    timeout=300,       # cap in seconds
+    gamma_range=(0.3, 0.7),
+    epsilon_range=(0.1, 0.4),
+    mu_range=(0.5, 0.9),
+    alpha_range=(0.4, 0.8),
+    seed=seed
+)
 
     print(f"[Bootstrap] Best MSM params: {best_msm_params}")
     print(f"[Bootstrap] Train F1: {best_msm_metrics['F1']}")
@@ -145,10 +148,10 @@ def main(args):
 
     num_perm = 128
 
-    gamma_grid = [0.4, 0.5]
-    epsilon_grid = [0.2, 0.3]
-    mu_grid = [0.7, 0.8]
-    alpha_grid = [0.5, 0.6]
+    gamma_grid = [0.45, 0.5]
+    epsilon_grid = [0.25, 0.3]
+    mu_grid = [0.65, 0.7]
+    alpha_grid = [0.6, 0.65]
 
     all_results = []
 
@@ -196,3 +199,5 @@ if __name__ == "__main__":
                         help="If set, use only the first N clusters for quick runs.")
     args = parser.parse_args()
     main(args)
+
+# python src/main.py --path data/TVs-all-merged.json --bootstraps 3 --max_clusters 400

@@ -1,3 +1,4 @@
+import optuna
 from collections import defaultdict
 from itertools import product
 
@@ -88,30 +89,35 @@ def run_msm_and_evaluate(brand_candidates, data, gamma, epsilon, mu, alpha, bran
     )
     return metrics
 
+
 def tune_msm_params(
     brand_candidates,
     data,
     brands,
     train_cluster_ids=None,
-    gamma_values=None,
-    epsilon_values=None,
-    mu_values=None,
-    alpha_values=None,
+    n_trials=30,
+    timeout=None,
+    gamma_range=(0.2, 0.8),
+    epsilon_range=(0.1, 0.5),
+    mu_range=(0.3, 0.9),
+    alpha_range=(0.4, 0.9),
+    seed: int | None = None,
 ):
-    if gamma_values is None:
-        gamma_values = [0.3, 0.5, 0.7]
-    if epsilon_values is None:
-        epsilon_values = [0.2, 0.3, 0.4]
-    if mu_values is None:
-        mu_values = [0.3, 0.5, 0.7]
-    if alpha_values is None:
-        alpha_values = [0.5, 0.6, 0.7]
 
-    best_F1 = -1.0
-    best_params = None
-    best_metrics = None
+    sampler = optuna.samplers.TPESampler(seed=seed)
 
-    for gamma, epsilon, mu, alpha in product(gamma_values, epsilon_values, mu_values, alpha_values):
+    study = optuna.create_study(
+        direction="maximize",
+        sampler=sampler,
+        study_name="msm_hparam_tuning",
+    )
+
+    def objective(trial: optuna.Trial) -> float:
+        gamma = trial.suggest_float("gamma", gamma_range[0], gamma_range[1])
+        epsilon = trial.suggest_float("epsilon", epsilon_range[0], epsilon_range[1])
+        mu = trial.suggest_float("mu", mu_range[0], mu_range[1])
+        alpha = trial.suggest_float("alpha", alpha_range[0], alpha_range[1])
+
         metrics = run_msm_and_evaluate(
             brand_candidates=brand_candidates,
             data=data,
@@ -122,14 +128,21 @@ def tune_msm_params(
             brands=brands,
             allowed_cluster_ids=train_cluster_ids,
         )
-        F1 = metrics["F1"]
-        print(
-            f"gamma={gamma}, epsilon={epsilon}, mu={mu}, alpha={alpha} "
-            f"-> F1={F1:.4f}, precision={metrics['precision']:.4f}, recall={metrics['recall']:.4f}"
-        )
-        if F1 > best_F1:
-            best_F1 = F1
-            best_params = {"gamma": gamma, "epsilon": epsilon, "mu": mu, "alpha": alpha}
-            best_metrics = metrics
 
-    return best_params, best_metrics 
+        
+        trial.set_user_attr("metrics", metrics)
+
+        return metrics["F1"] 
+
+    study.optimize(objective, n_trials=n_trials, timeout=timeout, n_jobs=7)
+
+    best_trial = study.best_trial
+    best_params = {
+        "gamma": best_trial.params["gamma"],
+        "epsilon": best_trial.params["epsilon"],
+        "mu": best_trial.params["mu"],
+        "alpha": best_trial.params["alpha"],
+    }
+    best_metrics = best_trial.user_attrs["metrics"]
+
+    return best_params, best_metrics
