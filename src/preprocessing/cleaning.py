@@ -308,6 +308,7 @@ def prepare_datasets(raw_data, seed=None):
         "known_brands": known_brands,
     }
 
+# For testing
 def run(data):
     data = annotate_offers_with_brand(copy.deepcopy(data))
 
@@ -324,6 +325,7 @@ def run(data):
 
     return train, test, set(brands_train.keys()), set(brands_test.keys())
 
+# Main guard
 if __name__ == "__main__":
     import argparse, json
     parser = argparse.ArgumentParser()

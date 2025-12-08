@@ -13,20 +13,8 @@ from evaluation.msm_eval import tune_msm_params, run_msm_and_evaluate
 def run_single_bootstrap(raw_data,
                          seed,
                          num_perm=128,
-                         lsh_max_FC=0.85,
-                         gamma_grid=None,
-                         epsilon_grid=None,
-                         mu_grid=None,
-                         alpha_grid=None):
+                         lsh_max_FC=0.85):
 
-    if gamma_grid is None:
-        gamma_grid = [0.4, 0.5]
-    if epsilon_grid is None:
-        epsilon_grid = [0.2, 0.3]
-    if mu_grid is None:
-        mu_grid = [0.7, 0.8]
-    if alpha_grid is None:
-        alpha_grid = [0.5, 0.6]
 
     # --- Prepare datasets (this already does a bootstrap split internally) ---
     datasets = prepare_datasets(raw_data, seed=seed)
@@ -141,10 +129,7 @@ def main(args):
 
     num_perm = 128
 
-    gamma_grid = [0.45, 0.5]
-    epsilon_grid = [0.25, 0.3]
-    mu_grid = [0.65, 0.7]
-    alpha_grid = [0.6, 0.65]
+    
 
     all_results = []
 
@@ -157,10 +142,6 @@ def main(args):
             seed=seed,
             num_perm=num_perm,
             lsh_max_FC=args.lsh_max_FC,
-            gamma_grid=gamma_grid,
-            epsilon_grid=epsilon_grid,
-            mu_grid=mu_grid,
-            alpha_grid=alpha_grid,
         )
         all_results.append(res)
 
