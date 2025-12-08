@@ -18,12 +18,6 @@ def run_single_bootstrap(raw_data,
                          epsilon_grid=None,
                          mu_grid=None,
                          alpha_grid=None):
-    """
-    Run the full LSH + MSM pipeline once for a given seed.
-    Returns a dict with:
-      - 'lsh_params', 'lsh_metrics'
-      - 'msm_params', 'train_metrics', 'test_metrics'
-    """
 
     if gamma_grid is None:
         gamma_grid = [0.4, 0.5]
@@ -34,7 +28,7 @@ def run_single_bootstrap(raw_data,
     if alpha_grid is None:
         alpha_grid = [0.5, 0.6]
 
-    # --- 1. Prepare datasets (this already does a bootstrap split internally) ---
+    # --- Prepare datasets (this already does a bootstrap split internally) ---
     datasets = prepare_datasets(raw_data, seed=seed)
     cleaned_data = datasets["cleaned_all"]
     data_train = datasets["data_train"]
@@ -47,7 +41,7 @@ def run_single_bootstrap(raw_data,
     print("  Train clusters:", len(data_train))
     print("  Test  clusters:", len(data_test))
 
-    # --- 2. LSH on TRAIN: build signatures and tune (b, r) ---
+    # --- LSH on TRAIN: build signatures and tune (b, r) ---
     brand_signatures_train, small_brand_offers_train, _ = build_minhash_for_brands(
         brand_blocks_train, num_perm=num_perm, seed=seed
     )
@@ -69,7 +63,6 @@ def run_single_bootstrap(raw_data,
         brand_signatures_train, b, r
     )
 
-    # add small brands (all pairs)
     small_brand_candidates_train, _ = generate_small_brand_candidate_pairs(
         small_brand_offers_train
     )
@@ -80,7 +73,7 @@ def run_single_bootstrap(raw_data,
 
     train_clusters = set(data_train.keys())
 
-    # --- 3. MSM tuning on TRAIN ---
+    # --- MSM tuning on TRAIN ---
     best_msm_params, best_msm_metrics = tune_msm_params(
     brand_candidates=brand_candidates_train,
     data=cleaned_data,
@@ -98,7 +91,7 @@ def run_single_bootstrap(raw_data,
     print(f"[Bootstrap] Best MSM params: {best_msm_params}")
     print(f"[Bootstrap] Train F1: {best_msm_metrics['F1']}")
 
-    # --- 4. Run LSH + MSM on TEST with tuned params ---
+    # --- Run LSH + MSM on TEST with tuned params ---
     brand_signatures_test, small_brand_offers_test, _ = build_minhash_for_brands(
         brand_blocks_test, num_perm=num_perm, seed=seed
     )
@@ -142,7 +135,7 @@ def main(args):
     with open(args.path) as f:
         raw_data = json.load(f)
 
-    # Optional: restrict to first N clusters for quick testing
+    # Test: restrict to first N clusters for quick testing
     if args.max_clusters is not None:
         raw_data = dict(list(raw_data.items())[:args.max_clusters])
 
@@ -174,7 +167,7 @@ def main(args):
     # ---- Aggregate TEST metrics over bootstraps ----
     test_metrics_list = [r["test_metrics"] for r in all_results]
 
-    # keys we want to average (all numeric)
+   
     metric_keys = list(test_metrics_list[0].keys())
     avg_test_metrics = {
         k: float(np.mean([m[k] for m in test_metrics_list]))
