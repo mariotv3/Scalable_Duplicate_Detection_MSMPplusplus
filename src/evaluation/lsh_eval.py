@@ -1,6 +1,7 @@
 import numpy as np
 from itertools import combinations
 
+
 from lsh.lsh import lsh_for_brand_block, factor_pairs
 
 
@@ -84,7 +85,7 @@ def tune_lsh_parameters(brand_signatures, data, num_perm, max_FC=0.8):
             continue
         m = evaluate_lsh_global(brand_signatures, data, b, r)
 
-        if m["FC"] < max_FC and m["PC"] > best_PC:
+        if r != 1 and m["FC"] < max_FC and m["PC"] > best_PC:
             best_PC = m["PC"]
             best_params = (b, r)
             best_metrics = m

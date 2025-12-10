@@ -83,3 +83,46 @@ def run_lsh_for_all_brands(brand_signatures, b, r):
         brand_lsh_candidates[brand] = pairs_offer_ids
 
     return brand_lsh_candidates
+
+
+def generate_lsh_configs(num_perm: int, max_delta: int = 2):
+    """
+    Return a list of (k_eff, b, r) such that
+      - k_eff in [num_perm-max_delta, num_perm+max_delta]
+      - k_eff = b * r
+      - k_eff >= 1
+    We'll later slice signatures[:k_eff, :] if k_eff <= num_perm.
+    """
+    configs = []
+
+    for k_eff in range(max(1, num_perm - max_delta), num_perm + max_delta + 1):
+        for b, r in factor_pairs(k_eff):
+            configs.append((k_eff, b, r))
+
+    configs = sorted(set(configs))
+    return configs
+
+def run_lsh_for_all_brands_with_keff(brand_signatures, k_eff, b, r):
+    """
+    brand_signatures: {brand: (offer_ids, sigs)} with sigs.shape = (num_perm, N)
+    k_eff: number of rows actually used for LSH (k_eff <= num_perm)
+    b, r: banding params with k_eff = b * r
+    """
+    brand_lsh_candidates = {}
+    brand_lsh_doc_cands = {}
+
+    for brand, (offer_ids, sigs) in brand_signatures.items():
+        k, n = sigs.shape
+        if n < 2:
+            continue
+
+        if k_eff > k:
+            raise ValueError(f"k_eff={k_eff} > k={k} for brand {brand}")
+
+        sigs_eff = sigs[:k_eff, :]
+
+        pairs, doc_to_cand = lsh_for_brand_block(offer_ids, sigs_eff, b, r)
+        brand_lsh_candidates[brand] = pairs
+        brand_lsh_doc_cands[brand] = doc_to_cand
+
+    return brand_lsh_candidates, brand_lsh_doc_cands

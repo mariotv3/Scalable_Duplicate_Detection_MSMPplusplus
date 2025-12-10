@@ -1,7 +1,8 @@
 import re
-from typing import Dict, List, Tuple, Iterable, Set
-
 import numpy as np
+from typing import Dict, List, Tuple, Iterable, Set
+from collections import Counter
+
 
 NUMERIC_PREFIX = re.compile(r"^\d+(?:\.\d+)?")
 PRIME_32 = 4294967291
@@ -65,14 +66,36 @@ def process_brand_block(
     A: np.ndarray,
     B: np.ndarray,
     P: int,
+    max_df_frac: float = 0.5,  # drop shingles present in >50% of offers
+    min_df: int = 2,           # drop shingles seen in fewer than 2 offers
 ) -> Tuple[List[str], np.ndarray]:
+
+ 
+    raw_shingle_sets: Dict[str, Set[str]] = {}
+    for offer_id, offer in items:
+        raw_shingle_sets[offer_id] = extract_shingles_for_offer(offer)
+
+    N_offers = len(items)
+
+    df = Counter()
+    for s_set in raw_shingle_sets.values():
+        for sh in s_set:
+            df[sh] += 1
+
     shingle_to_id: Dict[str, int] = {}
     product_shingle_sets: Dict[str, Set[int]] = {}
 
-    for offer_id, offer in items:
-        shingles = extract_shingles_for_offer(offer)
+    for offer_id, s_set in raw_shingle_sets.items():
+        filtered = {
+            sh for sh in s_set
+            if df[sh] >= min_df and df[sh] <= max_df_frac * N_offers
+        }
+
+        if not filtered:
+            filtered = s_set
+
         product_shingle_sets[offer_id] = shingles_to_ints_local(
-            shingles, shingle_to_id
+            filtered, shingle_to_id
         )
 
     offer_ids = list(product_shingle_sets.keys())
@@ -83,7 +106,7 @@ def process_brand_block(
         sigs[:, j] = compute_minhash_signature(
             product_shingle_sets[oid], A, B, P
         )
-    
+
     return offer_ids, sigs
 
 

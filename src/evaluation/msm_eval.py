@@ -1,6 +1,7 @@
 import optuna
 from collections import defaultdict
 from itertools import product
+from optuna.samplers import TPESampler
 
 from msm.msm import msm_for_all_brands, clusters_to_pairs_by_brand
 
@@ -134,7 +135,7 @@ def tune_msm_params(
 
         return metrics["F1"] 
 
-    study.optimize(objective, n_trials=n_trials, timeout=timeout, n_jobs=7)
+    study.optimize(objective, n_trials=n_trials, timeout=timeout, n_jobs=1)
 
     best_trial = study.best_trial
     best_params = {
