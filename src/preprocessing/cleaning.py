@@ -256,8 +256,8 @@ def keep_only_features_brand_and_title(data):
             offer["featuresMap"] = features_map
             offer["brand"] = brand
     return data
-# r"\b(?=\w*[a-zA-Z])(?=\w*\d)[a-zA-Z0-9-]+\b"
-MODEL_WORD_PATTERN = re.compile(r"\b(?=\w*\d)[a-zA-Z0-9-]+\b")
+# r"\b(?=\w*\d)[a-zA-Z0-9-]+\b"
+MODEL_WORD_PATTERN = re.compile(r"\b(?=\w*[a-zA-Z])(?=\w*\d)[a-zA-Z0-9-]+\b")
 
 def extract_title_model_words(title: str):
     if not isinstance(title, str):
@@ -266,7 +266,7 @@ def extract_title_model_words(title: str):
     return set(tokens)
 
 def add_model_words_from_title(cleaned_data):
-    for cluster_id, offers in cleaned_data.items():
+    for _ , offers in cleaned_data.items():
         for offer in offers:
             title = offer.get("title", "")
             mw_set = extract_title_model_words(title)

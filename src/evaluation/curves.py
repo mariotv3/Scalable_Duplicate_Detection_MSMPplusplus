@@ -25,10 +25,6 @@ def eval_full_model_for_lsh_configs(
 
     rows: List[Dict[str, Any]] = []
 
-    # vary k_eff between num_perm - max_delta and num_perm + max_delta,
-    # but LSH only uses as many rows as we actually give it in signatures.
-    # For k_eff < num_perm we just slice the first k_eff rows.
-    # (For k_eff > num_perm we skip, because we don't have that many rows.)
     k_candidates = range(num_perm - max_delta, num_perm + 1)
 
     for k_eff in k_candidates:
@@ -123,4 +119,62 @@ def eval_full_model_for_lsh_configs(
                 }
             )
 
+    # append a row to rows with the results for the msm run with all possible pairups within each brand in the test set (FC=1)
+    # Build full candidate set: all pairs within each brand
+    full_brand_candidates: Dict[str, List[Tuple[str, str]]] = {}
+
+    # "Big" brands (those with signatures)
+    for brand, (offer_ids, _) in brand_signatures_test.items():
+        n = len(offer_ids)
+        if n < 2:
+            continue
+        pairs = []
+        for i in range(n):
+            for j in range(i + 1, n):
+                pairs.append((offer_ids[i], offer_ids[j]))
+        full_brand_candidates[brand] = pairs
+
+    # "Small" brands
+    for brand, items in small_brand_offers_test.items():
+        offer_ids = [oid for oid, _ in items]
+        n = len(offer_ids)
+        if n < 2:
+            continue
+        pairs = []
+        for i in range(n):
+            for j in range(i + 1, n):
+                pairs.append((offer_ids[i], offer_ids[j]))
+        if brand in full_brand_candidates:
+            full_brand_candidates[brand].extend(pairs)
+        else:
+            full_brand_candidates[brand] = pairs
+
+    # By construction this is all possible within-brand pairs → FC = 1.0
+    msm_metrics_full = run_msm_and_evaluate(
+        brand_candidates=full_brand_candidates,
+        data=cleaned_data,
+        gamma=msm_params["gamma"],
+        epsilon=msm_params["epsilon"],
+        mu=msm_params["mu"],
+        alpha=msm_params["alpha"],
+        beta=msm_params["beta"],
+        delta=msm_params["delta"],
+        eta=msm_params["eta"],
+        allowed_cluster_ids=test_clusters,
+    )
+
+    rows.append(
+        {
+            "k_eff": None,   # no LSH here
+            "b": None,
+            "r": None,
+            "FC": 1.0,
+            # LSH metrics are not really defined when you don't use LSH;
+            # you can keep them as NaN and only use F1 for the FC=1 point.
+            "PQ": 0.0001,
+            "PC": 1.0,
+            "F1*": 0.0001,
+            "F1": msm_metrics_full["F1"],
+        }
+    )
     return rows

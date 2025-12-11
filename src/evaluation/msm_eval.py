@@ -5,6 +5,7 @@ from optuna.samplers import TPESampler
 
 from msm.msm import msm_for_all_brands, clusters_to_pairs_by_brand
 
+#optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 def get_model_id(offer_id, data):
     cid, idx = offer_id.split("#", 1)
@@ -98,7 +99,7 @@ def tune_msm_params(
     data,
     train_cluster_ids=None,
     n_trials=30,
-    timeout=None,
+    timeout=3600,
     gamma_range=(0.2, 0.8),
     epsilon_range=(0.1, 0.5),
     mu_range=(0.3, 0.9),
@@ -106,7 +107,7 @@ def tune_msm_params(
     beta_range=(0.0,0.2),
     eta_range=(0.3,0.7),
     delta_range=(0.3,0.7),
-    seed: int | None = None,
+    seed: int = 123,
 ):
 
     sampler = optuna.samplers.TPESampler(seed=seed)

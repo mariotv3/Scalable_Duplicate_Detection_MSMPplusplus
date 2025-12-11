@@ -31,7 +31,6 @@ def run_single_bootstrap(raw_data,
     data_test = datasets["data_test"]
     brand_blocks_train = datasets["brand_blocks_train"]
     brand_blocks_test = datasets["brand_blocks_test"]
-    known_brands = datasets["known_brands"]
 
     print(f"[Bootstrap seed={seed}] Data cleaned and split.")
     print("  Train clusters:", len(data_train))
@@ -41,7 +40,7 @@ def run_single_bootstrap(raw_data,
     brand_signatures_train, small_brand_offers_train, _ = build_minhash_for_brands(
         brand_blocks_train, num_perm=num_perm, seed=seed
     )
-    print("[Bootstrap] Minhash on TRAIN done.")
+    print(f"[Bootstrap seed={seed}] Minhash on TRAIN done.")
 
     best_lsh_params, best_lsh_metrics = tune_lsh_parameters(
         brand_signatures=brand_signatures_train,
@@ -50,7 +49,7 @@ def run_single_bootstrap(raw_data,
         min_PC=lsh_min_PC,
     )
     b, r = best_lsh_params
-    print(f"[Bootstrap] Best LSH params: b={b}, r={r}")
+    print(f"[Bootstrap {seed}] Best LSH params: b={b}, r={r}")
     print(f"  LSH PC (recall) = {best_lsh_metrics['PC']}")
     print(f"  LSH PQ (precision) = {best_lsh_metrics['PQ']}")
     print(f"  LSH FC (fraction comparisons) = {best_lsh_metrics['FC']}")
@@ -86,8 +85,8 @@ def run_single_bootstrap(raw_data,
     seed=seed
 )
 
-    print(f"[Bootstrap] Best MSM params: {best_msm_params}")
-    print(f"[Bootstrap] Train F1: {best_msm_metrics['F1']}")
+    print(f"[Bootstrap {seed}] Best MSM params: {best_msm_params}")
+    print(f"[Bootstrap {seed}] Train F1: {best_msm_metrics['F1']}")
 
     # --- Run LSH + MSM on TEST with tuned params ---
     brand_signatures_test, small_brand_offers_test, _ = build_minhash_for_brands(
@@ -119,7 +118,7 @@ def run_single_bootstrap(raw_data,
         allowed_cluster_ids=test_clusters,
     )
 
-    print("[Bootstrap] TEST metrics:")
+    print(f"[Bootstrap {seed}] TEST metrics:")
     for k, v in test_metrics.items():
         print(f"  {k}: {v}")
 
@@ -230,23 +229,29 @@ def main(args):
         labels=False,      
     )
 
-    # ---- aggregate per bin ----
     agg = (
         curve_df
         .groupby("FC_bin")
         .agg(
-            FC=("FC", "mean"),     
+            FC=("FC", "mean"),
             F1=("F1", "mean"),
             PQ=("PQ", "mean"),
             PC=("PC", "mean"),
             F1_star=("F1*", "mean"),
-            count=("FC", "size"),  # how many points in the bin
-        )   
+            count=("FC", "size")
+        )
         .reset_index(drop=True)
     )
 
+    
+    # ---- aggregate per bin ----
+    agg = agg.sort_values("FC").reset_index(drop=True)
+    window = 3  # or 5, tuned by eye
+
+    for col in ["F1", "PQ", "PC", "F1_star"]:
+        agg[col + "_smooth"] = agg[col].rolling(window=window, min_periods=1, center=True).median()
     # optional: drop bins with very few points (to reduce noise)
-    min_points_per_bin = 2
+    min_points_per_bin = 0
     agg = agg[agg["count"] >= min_points_per_bin]
 
     # make sure rows are sorted by FC
@@ -272,7 +277,7 @@ def main(args):
 
 
     # note: use the column name "F1_star" here, not "F1*"
-    for metric in ["F1", "PQ", "PC", "F1_star"]:
+    for metric in ["F1_smooth", "F1", "PQ", "PC", "F1_star"]:
         plot_metric_vs_FC(agg, metric)
 
 if __name__ == "__main__":

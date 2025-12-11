@@ -329,7 +329,7 @@ def msm_clustering_for_brand(
             p1, p2, beta=beta, delta = delta, eta=eta, gamma=gamma, mu=mu, alpha=alpha
         )
         if d > 0.4:
-            d = 100.0
+            d = 1.0
         dissimilarity.loc[oid1, oid2] = d
         dissimilarity.loc[oid2, oid1] = d
 
