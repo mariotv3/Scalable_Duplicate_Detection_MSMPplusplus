@@ -339,7 +339,6 @@ def msm_pair_dissimilarity(product_1,
 
 
 def msm_clustering_for_brand(
-    brand,
     brands,
     candidate_pairs,
     data,
@@ -369,7 +368,7 @@ def msm_clustering_for_brand(
             p1, p2, brands=brands, gamma=gamma, mu=mu, alpha=alpha
         )
         if d > 0.4:
-            d = 1.0
+            d = 100.0
         dissimilarity.loc[oid1, oid2] = d
         dissimilarity.loc[oid2, oid1] = d
 
@@ -407,7 +406,6 @@ def msm_for_all_brands(
 
     for brand, pairs in brand_candidates.items():
         clusters, dissim = msm_clustering_for_brand(
-            brand=brand,
             brands=brands,
             candidate_pairs=pairs,
             data=data,

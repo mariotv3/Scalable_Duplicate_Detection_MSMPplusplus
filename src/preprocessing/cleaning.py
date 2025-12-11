@@ -115,25 +115,25 @@ def annotate_offers_with_brand(data):
     return data
 
 CLEAN_MAP_MW = {
-    " inch ": [
+    "inch ": [
         "inches", "inch", "\"", "”", "'", "-inch"
     ],
-    " hz ": [
+    "hz ": [
         "hertz", "hz", "hz."
     ],
-    " lb ": [
+    "lb ": [
         "pounds", "pound", "lbs.", "lbs", "lb.", "lb"
     ],
-    " kg ": [
+    "kg ": [
         "kg.", "kg", "kgs", "kilograms", "kilogram", "kg)", "kg )", "Kg", "Kg.", "Kgs"
     ],
-    " w ": [
+    "w ": [
         "watts", "watt", "w.", "w"
     ],
-    " cd/m2 ": [
+    "cd/m2 ": [
         "cd/mÂ²", "cd/m²", "cd/m2", "cd / m2", "cd / mÂ²", "cd / m²"
     ],
-    " deg ": [
+    "deg ": [
         "°", "º", "&#176;", "degrees", "degree"
     ],
 }
@@ -229,14 +229,14 @@ def keep_only_numeric_features(cleaned_data):
 
 def bootstrap_split_clusters(data, rng=None):
     if rng is None:
-        rng = np.random.default_rng()
-    cluster_ids = list(data.keys())
+        rng = np.random.default_rng(123)
+    cluster_ids = sorted(data.keys())
     N = len(cluster_ids)
     sample_indices = rng.integers(low=0, high=N, size=N, endpoint=False)
     bootstrap_ids = [cluster_ids[i] for i in sample_indices]
-    train_ids = set(bootstrap_ids)
-    test_ids = set(cluster_ids) - train_ids
-    assert train_ids.isdisjoint(test_ids)
+    train_ids = sorted(set(bootstrap_ids))
+    test_ids = sorted(set(cluster_ids) - set(train_ids))
+    assert set(train_ids).isdisjoint(set(test_ids))
     train_clusters = {cid: data[cid] for cid in train_ids}
     test_clusters = {cid: data[cid] for cid in test_ids}
     return train_clusters, test_clusters
@@ -252,8 +252,8 @@ def keep_only_features_brand_and_title(data):
             offer["featuresMap"] = features_map
             offer["brand"] = brand
     return data
-
-MODEL_WORD_PATTERN = re.compile(r"\b(?=\w*[a-zA-Z])(?=\w*\d)[a-zA-Z0-9-]+\b")
+# r"\b(?=\w*[a-zA-Z])(?=\w*\d)[a-zA-Z0-9-]+\b"
+MODEL_WORD_PATTERN = re.compile(r"\b(?=\w*\d)[a-zA-Z0-9-]+\b")
 
 def extract_title_model_words(title: str):
     if not isinstance(title, str):
@@ -313,9 +313,9 @@ def run(data):
     data = annotate_offers_with_brand(copy.deepcopy(data))
 
     cleaned_dups, cleaned_single = clean_data_optimized(data)
-
-    dups_train, dups_test = bootstrap_split_clusters(cleaned_dups)
-    singles_train, singles_test = bootstrap_split_clusters(cleaned_single)
+    rng = np.random.default_rng(123)
+    dups_train, dups_test = bootstrap_split_clusters(cleaned_dups, rng=rng)
+    singles_train, singles_test = bootstrap_split_clusters(cleaned_single, rng=rng)
 
     train = {**dups_train, **singles_train}
     test  = {**dups_test,  **singles_test}

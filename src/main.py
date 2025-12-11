@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import time
+import random
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
@@ -19,8 +20,9 @@ from evaluation.curves import eval_full_model_for_lsh_configs
 def run_single_bootstrap(raw_data,
                          seed,
                          num_perm=128,
-                         lsh_max_FC=0.85):
-
+                         lsh_min_PC=0.9):
+    
+    random.seed(seed)
     np.random.seed(seed)
     # --- Prepare datasets (this already does a bootstrap split internally) ---
     datasets = prepare_datasets(raw_data, seed=seed)
@@ -45,7 +47,7 @@ def run_single_bootstrap(raw_data,
         brand_signatures=brand_signatures_train,
         data=raw_data,
         num_perm=num_perm,
-        max_FC=lsh_max_FC,
+        min_PC=lsh_min_PC,
     )
     b, r = best_lsh_params
     print(f"[Bootstrap] Best LSH params: b={b}, r={r}")
@@ -65,7 +67,7 @@ def run_single_bootstrap(raw_data,
         **small_brand_candidates_train,
     }
 
-    train_clusters = set(data_train.keys())
+    train_clusters = sorted(set(data_train.keys()))
 
     # --- MSM tuning on TRAIN ---
     best_msm_params, best_msm_metrics = tune_msm_params(
@@ -147,7 +149,7 @@ def main(args):
         raw_data = dict(list(raw_data.items())[:args.max_clusters])
 
 
-    num_perm = 240
+    num_perm = 120
     all_results = []
 
     # ---- SEQUENTIAL VERSION (fallback / n_jobs_bootstrap=1) ----
@@ -159,7 +161,7 @@ def main(args):
                 raw_data,
                 seed,
                 num_perm,
-                args.lsh_max_FC,
+                args.lsh_min_PC,
             )
             all_results.append(res)
 
@@ -174,7 +176,7 @@ def main(args):
                     raw_data,      
                     s,             
                     num_perm,      
-                    args.lsh_max_FC,  
+                    args.lsh_min_PC,  
                 ): s
                 for s in seeds
             }
@@ -273,15 +275,15 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", default="data/TVs-all-merged.json")
-    parser.add_argument("--bootstraps", type=int, default=21,
+    parser.add_argument("--bootstraps", type=int, default=5,
                         help="Number of bootstrap repetitions.")
     parser.add_argument("--seed", type=int, default=123,
                         help="Base random seed.")
-    parser.add_argument("--lsh_max_FC", type=float, default=0.80,
-                        help="Maximum allowed fraction of comparisons for LSH tuning.")
+    parser.add_argument("--lsh_min_PC", type=float, default=0.8,
+                        help="Minimum allowed ratio of true duplicates retained after LSH.")
     parser.add_argument("--max_clusters", type=int, default=None,
                         help="If set, use only the first N clusters for quick runs.")
-    parser.add_argument("--n_jobs_bootstrap", type=int, default=7,
+    parser.add_argument("--n_jobs_bootstrap", type=int, default=5,
                         help="Number of processes to use for parallel bootstraps.")
     args = parser.parse_args()
     start = time.perf_counter()

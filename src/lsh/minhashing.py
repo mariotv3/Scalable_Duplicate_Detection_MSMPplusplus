@@ -101,20 +101,23 @@ def process_brand_block(
     offer_ids = list(product_shingle_sets.keys())
     n = len(offer_ids)
     sigs = np.empty((num_perm, n), dtype=np.uint32)
-
+    max_shingle = -1
     for j, oid in enumerate(offer_ids):
+        max_shingle_oid = max(product_shingle_sets.get(oid))
+        if max_shingle_oid > max_shingle:
+            max_shingle = max_shingle_oid
         sigs[:, j] = compute_minhash_signature(
             product_shingle_sets[oid], A, B, P
         )
-
-    return offer_ids, sigs
+    print("max_shingle: ", max_shingle)
+    return offer_ids, sigs,
 
 
 def build_minhash_for_brands(
     brand_blocks: Dict[str, List[Tuple[str, dict]]],
     num_perm: int = 128,
     seed: int | None = None,
-    min_offers_for_lsh: int = 4,
+    min_offers_for_lsh: int = 0,
 ):
     rng = np.random.default_rng(seed)
     A = rng.integers(1, PRIME_32, size=num_perm, dtype=np.uint32)
@@ -133,6 +136,6 @@ def build_minhash_for_brands(
             items, num_perm, A, B, PRIME_32
         )
         brand_signatures[brand] = (offer_ids, sigs)
-
+        print("Brand: ", brand)
     params = {"NUM_PERM": num_perm, "P": PRIME_32, "A": A, "B": B}
     return brand_signatures, small_brand_offers, params

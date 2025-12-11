@@ -36,6 +36,7 @@ def evaluate_lsh_global(brand_signatures, data, b, r):
     total_cand = 0         
     total_possible = 0     
 
+    total_offers = 0
     for _, (offer_ids, sigs) in brand_signatures.items():
         k, n = sigs.shape
         if n < 2:
@@ -43,6 +44,8 @@ def evaluate_lsh_global(brand_signatures, data, b, r):
         if k != b * r:
             raise ValueError(f"k={k} but b*r={b*r}")
         pairs, _ = lsh_for_brand_block(offer_ids, sigs, b, r)
+        
+        total_offers += len(offer_ids)
 
         m = evaluate_lsh_pairs_for_brand(
             pairs_offer_ids=pairs,
@@ -55,6 +58,7 @@ def evaluate_lsh_global(brand_signatures, data, b, r):
         total_possible += m["total_possible_pairs"]
         total_cand += len(pairs)
 
+    global_total_possible = total_offers * (total_offers-1) // 2
     PC = total_tp / total_true if total_true else 0.0     
     PQ = total_tp / total_cand if total_cand else 0.0    
     FC = total_cand / total_possible if total_possible else 0.0  
@@ -62,7 +66,7 @@ def evaluate_lsh_global(brand_signatures, data, b, r):
     F1_star = 2 * PQ * PC / (PQ + PC) if (PQ + PC) else 0.0
 
     print(f"(b,r): ({b},{r}), FC: {FC}, PC: {PC}, PQ: {PQ}")
-
+    #print("total pssible / global total possible", total_possible/global_total_possible)
     return {
         "TP": total_tp,
         "total_true": total_true,
@@ -75,18 +79,18 @@ def evaluate_lsh_global(brand_signatures, data, b, r):
     }
 
 
-def tune_lsh_parameters(brand_signatures, data, num_perm, max_FC=0.8):
+def tune_lsh_parameters(brand_signatures, data, num_perm, min_PC=0.9):
     best_params = (64, 2)
     best_metrics = None
-    best_PC = -1.0
+    best_FC = 1.0
 
     for b, r in factor_pairs(num_perm):
         if b * r != num_perm:
             continue
         m = evaluate_lsh_global(brand_signatures, data, b, r)
 
-        if r != 1 and m["FC"] < max_FC and m["PC"] > best_PC:
-            best_PC = m["PC"]
+        if m["FC"] < best_FC and m["PC"] > min_PC:
+            best_FC = m["FC"]
             best_params = (b, r)
             best_metrics = m
 

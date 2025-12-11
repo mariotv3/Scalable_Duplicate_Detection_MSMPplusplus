@@ -26,20 +26,18 @@ def eval_full_model_for_lsh_configs(
 
     rows: List[Dict[str, Any]] = []
 
-    # We will vary k_eff between num_perm - max_delta and num_perm + max_delta,
+    # vary k_eff between num_perm - max_delta and num_perm + max_delta,
     # but LSH only uses as many rows as we actually give it in signatures.
     # For k_eff < num_perm we just slice the first k_eff rows.
     # (For k_eff > num_perm we skip, because we don't have that many rows.)
-    k_candidates = range(num_perm - max_delta, num_perm + max_delta + 1)
+    k_candidates = range(num_perm - max_delta, num_perm + 1)
 
     for k_eff in k_candidates:
         if k_eff <= 0:
             continue
         if k_eff > num_perm:
-            # we only have num_perm rows in the signatures
             continue
 
-        # Factor pairs for this effective k
         for b, r in factor_pairs(k_eff):
             if b * r != k_eff:
                 continue
@@ -48,7 +46,6 @@ def eval_full_model_for_lsh_configs(
             brand_sigs_k: Dict[str, Tuple[List[str], np.ndarray]] = {}
             for brand, (offer_ids, sigs) in brand_signatures_test.items():
                 if sigs.shape[0] < k_eff:
-                    # not enough rows; skip this brand for this k_eff
                     continue
                 brand_sigs_k[brand] = (offer_ids, sigs[:k_eff, :])
 
@@ -62,8 +59,7 @@ def eval_full_model_for_lsh_configs(
                 b=b,
                 r=r,
             )
-            # These *always* exist because evaluate_lsh_global defines them
-            FC = lsh_metrics["FC"]
+            
             PQ = lsh_metrics["PQ"]
             PC = lsh_metrics["PC"]
             F1_star = lsh_metrics["F1*"]
@@ -81,6 +77,24 @@ def eval_full_model_for_lsh_configs(
                 **brand_lsh_candidates,
                 **small_brand_candidates,
             }
+
+            # # numerator: all candidate pairs across all brands
+            total_cand = sum(len(pairs) for pairs in brand_candidates.values())
+
+            # denominator: all possible pairs per brand, summed
+            total_possible = 0
+
+            for brand, (offer_ids, _) in brand_sigs_k.items():
+                n = len(offer_ids)
+                if n >= 2:
+                    total_possible += n * (n - 1) // 2
+            
+            for brand, items in small_brand_offers_test.items():
+                n = len(items)
+                if n >= 2:
+                    total_possible += n * (n - 1) // 2
+
+            FC = total_cand / total_possible if total_possible > 0 else 0.0
 
             # --- Run MSM with *fixed* params on these candidates ---
             msm_metrics = run_msm_and_evaluate(
