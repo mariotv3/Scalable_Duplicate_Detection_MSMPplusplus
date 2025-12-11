@@ -2,7 +2,9 @@ import re
 import numpy as np
 from typing import Dict, List, Tuple, Iterable, Set
 from collections import Counter
+from numpy.random import Generator, PCG64
 
+rng = Generator(PCG64(123))
 
 NUMERIC_PREFIX = re.compile(r"^\d+(?:\.\d+)?")
 PRIME_32 = 4294967291
@@ -30,7 +32,7 @@ def shingles_to_ints_local(
     shingle_to_id: Dict[str, int],
 ) -> Set[int]:
     out = set()
-    for s in shingles:
+    for s in sorted(shingles):
         if s not in shingle_to_id:
             shingle_to_id[s] = len(shingle_to_id)
         out.add(shingle_to_id[s])
@@ -98,7 +100,7 @@ def process_brand_block(
             filtered, shingle_to_id
         )
 
-    offer_ids = list(product_shingle_sets.keys())
+    offer_ids = sorted(product_shingle_sets.keys())
     n = len(offer_ids)
     sigs = np.empty((num_perm, n), dtype=np.uint32)
     max_shingle = -1
@@ -109,14 +111,13 @@ def process_brand_block(
         sigs[:, j] = compute_minhash_signature(
             product_shingle_sets[oid], A, B, P
         )
-    print("max_shingle: ", max_shingle)
     return offer_ids, sigs,
 
 
 def build_minhash_for_brands(
     brand_blocks: Dict[str, List[Tuple[str, dict]]],
     num_perm: int = 128,
-    seed: int | None = None,
+    seed: int = 123,
     min_offers_for_lsh: int = 0,
 ):
     rng = np.random.default_rng(seed)
@@ -136,6 +137,5 @@ def build_minhash_for_brands(
             items, num_perm, A, B, PRIME_32
         )
         brand_signatures[brand] = (offer_ids, sigs)
-        print("Brand: ", brand)
     params = {"NUM_PERM": num_perm, "P": PRIME_32, "A": A, "B": B}
     return brand_signatures, small_brand_offers, params

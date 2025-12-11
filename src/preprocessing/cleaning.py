@@ -25,7 +25,8 @@ def normalize_brand(raw):
 def extract_brand(features_map):
     if not isinstance(features_map, dict):
         return "unknown"
-    for key, value in features_map.items():
+    for key in sorted(features_map.keys(), key=str):
+        value = features_map[key]
         if isinstance(key, str) and re.search(r"brand", key, re.IGNORECASE):
             if isinstance(value, str):
                 v = value.strip()
@@ -50,7 +51,10 @@ def propagate_brands_in_cluster(cluster_to_brands):
     for cid, brands in cluster_to_brands.items():
         non_unknown = [b for b in brands if b != "unknown"]
         if non_unknown:
-            most_common_brand = Counter(non_unknown).most_common(1)[0][0]
+            counts = Counter(non_unknown)
+            max_count = max(counts.values())
+            candidates = [b for b, c in counts.items() if c == max_count]
+            most_common_brand = sorted(candidates)[0]
             updated[cid] = [most_common_brand] * len(brands)
             known_brands.add(most_common_brand)
         else:
@@ -220,7 +224,7 @@ def extract_numeric_model_words_from_offer(offer: dict):
 
 def keep_only_numeric_features(cleaned_data):
     def transform_dict(data_dict):
-        for cluster_id, offers in data_dict.items():
+        for _, offers in data_dict.items():
             for offer in offers:
                 nums = sorted(extract_numeric_model_words_from_offer(offer))
                 offer["featuresMap"] = nums
@@ -242,7 +246,7 @@ def bootstrap_split_clusters(data, rng=None):
     return train_clusters, test_clusters
 
 def keep_only_features_brand_and_title(data):
-    for cluster_id, offers in data.items():
+    for _ , offers in data.items():
         for offer in offers:
             title = offer.get("title", "")
             features_map = offer.get("featuresMap", {})
@@ -281,7 +285,7 @@ def group_offers_by_brand(data):
             brand_blocks[brand].append((offer_id, offer))
     return brand_blocks, known_brands
 
-def prepare_datasets(raw_data, seed=None):
+def prepare_datasets(raw_data, seed=123):
     data = annotate_offers_with_brand(copy.deepcopy(raw_data))
     cleaned_dups, cleaned_single = clean_data_optimized(data)
     cleaned_all = {**cleaned_dups, **cleaned_single}

@@ -5,17 +5,16 @@ import numpy as np
 from itertools import combinations
 import random
 import matplotlib.pyplot as plt
-
+import os
 
 from preprocessing.cleaning import prepare_datasets
 from lsh.minhashing import extract_shingles_for_offer
 from lsh.lsh import lsh_for_brand_block, generate_lsh_configs
 
-
 # -------------------------------------------------------
 # MinHash Debugger
 # -------------------------------------------------------
-def debug_minhash_for_brand(brand, brand_blocks, brand_signatures, max_pairs=200):
+def debug_minhash_for_brand(brand, brand_blocks, brand_signatures, max_pairs=200, seed = 123):
     items = brand_blocks[brand]                     # [(offer_id, offer_dict), ...]
     offer_ids, sigs = brand_signatures[brand]       # sigs shape (num_perm, N)
 
@@ -29,6 +28,7 @@ def debug_minhash_for_brand(brand, brand_blocks, brand_signatures, max_pairs=200
     # Limit number of tested pairs
     all_pairs = list(combinations(offer_ids, 2))
     if len(all_pairs) > max_pairs:
+        rng = random.Random(seed)
         all_pairs = random.sample(all_pairs, max_pairs)
 
     true_jacc = []
@@ -90,8 +90,6 @@ def debug_lsh_for_brand(brand, brand_signatures, num_perm, max_delta=2):
               f"{len(pairs):4d} pairs,   FC={FC:.4f}")
 
 
-import os
-
 def jaccard(a, b):
     if not a and not b:
         return 0.0
@@ -111,6 +109,7 @@ def plot_jaccard_histograms(
     shingle_sets_by_oid,
     outfile: str = "jaccard_hist.png",
     max_pairs: int | None = 5000,
+    seed = 123
 ):
     """
     brand_items: list of (offer_id, offer_dict) for ONE brand
@@ -124,10 +123,8 @@ def plot_jaccard_histograms(
 
     all_pairs = list(combinations(brand_items, 2))
     if max_pairs is not None and len(all_pairs) > max_pairs:
-        # simple downsampling
-        import random
-        random.seed(0)
-        all_pairs = random.sample(all_pairs, max_pairs)
+        rng = random.Random(seed)
+        all_pairs = rng.sample(all_pairs, max_pairs)
 
     for (oid1, _), (oid2, _) in all_pairs:
         s1 = shingle_sets_by_oid[oid1]
@@ -165,6 +162,7 @@ def plot_jaccard_histograms(
 # Main guard
 # -------------------------------------------------------
 if __name__ == "__main__":
+    random.seed(123)
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", default="data/TVs-all-merged.json")
     parser.add_argument("--brand", required=False,

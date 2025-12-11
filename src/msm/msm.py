@@ -131,43 +131,6 @@ def same_shop(product_1, product_2, debug=False):
     return product_1.get("shop") == product_2.get("shop")
 
 
-def same_brand(product_1, product_2, brands, debug=False):
-    product_1_brand = "NA"
-    product_2_brand = "NA"
-
-    fm1 = product_1.get("featuresMap") or {}
-    fm2 = product_2.get("featuresMap") or {}
-
-    if fm1.get("Brand") is not None:
-        product_1_brand = fm1.get("Brand").lower()
-
-    if fm2.get("Brand") is not None:
-        product_2_brand = fm2.get("Brand").lower()
-
-    title1 = (product_1.get("title") or "").lower()
-    title2 = (product_2.get("title") or "").lower()
-
-    if product_1_brand == "NA":
-        for key in brands:
-            if re.search(rf'\b{re.escape(key.lower())}\b', title1):
-                product_1_brand = key.lower()
-                break
-
-    if product_2_brand == "NA":
-        for key in brands:
-            if re.search(rf'\b{re.escape(key.lower())}\b', title2):
-                product_2_brand = key.lower()
-                break
-
-    if debug:
-        print("brand1:", product_1_brand)
-        print("brand2:", product_2_brand)
-
-    return (product_1_brand == product_2_brand or
-            product_1_brand == "NA" or
-            product_2_brand == "NA")
-
-
 def same_resolution(product_1, product_2, debug=False):
     product_1_reso = "NA"
     product_2_reso = "NA"
@@ -212,7 +175,7 @@ def extract_model_words(features, keys):
     return model_words
 
 
-def title_comp(title_1, title_2, alpha, beta, delta, approx):
+def title_comp(title_1, title_2, alpha, beta, delta, eta):
     title_regex = r'([a-zA-Z0-9]*((\d*\.)?\d+[^0-9, ]+)[a-zA-Z0-9]*)'
 
     name_cosine_sim = cosineSim(title_1, title_2)
@@ -236,9 +199,9 @@ def title_comp(title_1, title_2, alpha, beta, delta, approx):
 
             approx_sim = norm_lv(non_numeric_1, non_numeric_2)
 
-            if approx_sim > approx and numeric_1 != numeric_2:
+            if approx_sim > eta and numeric_1 != numeric_2:
                 return -1
-            elif approx_sim > approx and numeric_1 == numeric_2:
+            elif approx_sim > eta and numeric_1 == numeric_2:
                 similar_model_words = True
 
     final_name_sim = beta * name_cosine_sim + (1 - beta) * avg_lv_sim(
@@ -259,14 +222,12 @@ def title_comp(title_1, title_2, alpha, beta, delta, approx):
 
 def msm_pair_dissimilarity(product_1,
                            product_2,
-                           brands,
+                           beta,
+                           delta,
+                           eta,
                            gamma,
                            mu,
-                           alpha,
-                           debug=False):
-    if brands is not None:
-        if not same_brand(product_1, product_2, brands, debug=False):
-            return 1.0
+                           alpha):
 
     if same_shop(product_1, product_2, debug=False):
         return 1.0
@@ -286,7 +247,6 @@ def msm_pair_dissimilarity(product_1,
     no_match_keys_2 = list(features_2.keys())
 
     for key_1 in list(features_1.keys()):
-        match = False
         for key_2 in list(no_match_keys_2):
             key_sim = q_gram_similarity(key_1, key_2, q=3)
             if key_sim > gamma:
@@ -299,7 +259,6 @@ def msm_pair_dissimilarity(product_1,
                 m += 1
                 w += key_sim
 
-                match = True
                 if key_1 in no_match_keys_1:
                     no_match_keys_1.remove(key_1)
                 if key_2 in no_match_keys_2:
@@ -321,9 +280,9 @@ def msm_pair_dissimilarity(product_1,
         product_1.get("title", ""),
         product_2.get("title", ""),
         alpha=alpha,
-        beta=0.0,
-        delta=0.5,
-        approx=0.5
+        beta=beta,
+        delta=delta,
+        eta=eta
     )
 
     if title_sim == -1:
@@ -339,13 +298,15 @@ def msm_pair_dissimilarity(product_1,
 
 
 def msm_clustering_for_brand(
-    brands,
     candidate_pairs,
     data,
     gamma,
     epsilon,
     mu,
-    alpha
+    alpha,
+    eta,
+    beta,
+    delta
 ):
     if not candidate_pairs:
         return [], pd.DataFrame()
@@ -365,7 +326,7 @@ def msm_clustering_for_brand(
         p2 = get_original_offer(oid2, data)
 
         d = msm_pair_dissimilarity(
-            p1, p2, brands=brands, gamma=gamma, mu=mu, alpha=alpha
+            p1, p2, beta=beta, delta = delta, eta=eta, gamma=gamma, mu=mu, alpha=alpha
         )
         if d > 0.4:
             d = 100.0
@@ -394,7 +355,9 @@ def msm_clustering_for_brand(
 
 def msm_for_all_brands(
     brand_candidates,
-    brands,
+    beta,
+    delta,
+    eta,
     data,
     gamma,
     epsilon,
@@ -406,13 +369,15 @@ def msm_for_all_brands(
 
     for brand, pairs in brand_candidates.items():
         clusters, dissim = msm_clustering_for_brand(
-            brands=brands,
             candidate_pairs=pairs,
             data=data,
             gamma=gamma,
             epsilon=epsilon,
             mu=mu,
-            alpha=alpha
+            alpha=alpha,
+            beta=beta,
+            delta=delta,
+            eta=eta
         )
         clusters_by_brand[brand] = clusters
         dissim_by_brand[brand] = dissim

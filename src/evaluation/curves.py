@@ -16,7 +16,6 @@ def eval_full_model_for_lsh_configs(
     brand_signatures_test: Dict[str, Tuple[List[str], np.ndarray]],
     small_brand_offers_test: Dict[str, List[Tuple[str, dict]]],
     cleaned_data: Dict[str, List[dict]],
-    known_brands,
     test_clusters,
     msm_params: Dict[str, float],
     num_perm: int,
@@ -104,7 +103,9 @@ def eval_full_model_for_lsh_configs(
                 epsilon=msm_params["epsilon"],
                 mu=msm_params["mu"],
                 alpha=msm_params["alpha"],
-                brands=known_brands,
+                beta=msm_params["beta"],
+                delta=msm_params["delta"],
+                eta=msm_params["eta"],
                 allowed_cluster_ids=test_clusters,
             )
             F1_full = msm_metrics["F1"]

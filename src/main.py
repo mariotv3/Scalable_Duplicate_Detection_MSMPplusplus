@@ -73,7 +73,6 @@ def run_single_bootstrap(raw_data,
     best_msm_params, best_msm_metrics = tune_msm_params(
     brand_candidates=brand_candidates_train,
     data=cleaned_data,
-    brands=known_brands,
     train_cluster_ids=train_clusters,
     n_trials=30, 
     timeout=3600,       # cap in seconds
@@ -81,6 +80,9 @@ def run_single_bootstrap(raw_data,
     epsilon_range=(0.1, 0.4),
     mu_range=(0.5, 0.9),
     alpha_range=(0.4, 0.8),
+    beta_range=(0.0,0.2),
+    eta_range=(0.3,0.7),
+    delta_range=(0.3,0.7),
     seed=seed
 )
 
@@ -111,7 +113,9 @@ def run_single_bootstrap(raw_data,
         epsilon=best_msm_params["epsilon"],
         mu=best_msm_params["mu"],
         alpha=best_msm_params["alpha"],
-        brands=known_brands,
+        beta=best_msm_params["beta"],
+        delta=best_msm_params["delta"],
+        eta=best_msm_params["eta"],
         allowed_cluster_ids=test_clusters,
     )
 
@@ -123,7 +127,6 @@ def run_single_bootstrap(raw_data,
     brand_signatures_test=brand_signatures_test,
     small_brand_offers_test=small_brand_offers_test,
     cleaned_data=cleaned_data,
-    known_brands=known_brands,
     test_clusters=test_clusters,
     msm_params=best_msm_params,
     num_perm=num_perm,
@@ -149,7 +152,7 @@ def main(args):
         raw_data = dict(list(raw_data.items())[:args.max_clusters])
 
 
-    num_perm = 120
+    num_perm = 240
     all_results = []
 
     # ---- SEQUENTIAL VERSION (fallback / n_jobs_bootstrap=1) ----
@@ -275,7 +278,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", default="data/TVs-all-merged.json")
-    parser.add_argument("--bootstraps", type=int, default=5,
+    parser.add_argument("--bootstraps", type=int, default=7,
                         help="Number of bootstrap repetitions.")
     parser.add_argument("--seed", type=int, default=123,
                         help="Base random seed.")
@@ -283,7 +286,7 @@ if __name__ == "__main__":
                         help="Minimum allowed ratio of true duplicates retained after LSH.")
     parser.add_argument("--max_clusters", type=int, default=None,
                         help="If set, use only the first N clusters for quick runs.")
-    parser.add_argument("--n_jobs_bootstrap", type=int, default=5,
+    parser.add_argument("--n_jobs_bootstrap", type=int, default=7,
                         help="Number of processes to use for parallel bootstraps.")
     args = parser.parse_args()
     start = time.perf_counter()

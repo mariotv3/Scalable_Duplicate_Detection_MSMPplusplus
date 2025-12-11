@@ -72,10 +72,12 @@ def evaluate_predicted_pairs(predicted_pairs, data, allowed_cluster_ids=None):
         "F1": F1
     }
 
-def run_msm_and_evaluate(brand_candidates, data, gamma, epsilon, mu, alpha, brands, allowed_cluster_ids=None):
+def run_msm_and_evaluate(brand_candidates, data, gamma, epsilon, mu, alpha, beta, delta, eta, allowed_cluster_ids=None):
     clusters_by_brand, _ = msm_for_all_brands(
         brand_candidates=brand_candidates,
-        brands=brands,
+        beta=beta,
+        delta=delta,
+        eta=eta,
         data=data,
         gamma=gamma,
         epsilon=epsilon,
@@ -94,7 +96,6 @@ def run_msm_and_evaluate(brand_candidates, data, gamma, epsilon, mu, alpha, bran
 def tune_msm_params(
     brand_candidates,
     data,
-    brands,
     train_cluster_ids=None,
     n_trials=30,
     timeout=None,
@@ -102,6 +103,9 @@ def tune_msm_params(
     epsilon_range=(0.1, 0.5),
     mu_range=(0.3, 0.9),
     alpha_range=(0.4, 0.9),
+    beta_range=(0.0,0.2),
+    eta_range=(0.3,0.7),
+    delta_range=(0.3,0.7),
     seed: int | None = None,
 ):
 
@@ -118,7 +122,10 @@ def tune_msm_params(
         epsilon = trial.suggest_float("epsilon", epsilon_range[0], epsilon_range[1])
         mu = trial.suggest_float("mu", mu_range[0], mu_range[1])
         alpha = trial.suggest_float("alpha", alpha_range[0], alpha_range[1])
-
+        beta = trial.suggest_float("beta", beta_range[0], beta_range[1])
+        delta = trial.suggest_float("delta", delta_range[0],delta_range[1])
+        eta = trial.suggest_float("eta", eta_range[0], eta_range[1])
+        
         metrics = run_msm_and_evaluate(
             brand_candidates=brand_candidates,
             data=data,
@@ -126,7 +133,9 @@ def tune_msm_params(
             epsilon=epsilon,
             mu=mu,
             alpha=alpha,
-            brands=brands,
+            beta=beta,
+            delta=delta,
+            eta=eta,
             allowed_cluster_ids=train_cluster_ids,
         )
 
@@ -143,6 +152,9 @@ def tune_msm_params(
         "epsilon": best_trial.params["epsilon"],
         "mu": best_trial.params["mu"],
         "alpha": best_trial.params["alpha"],
+        "beta":best_trial.params["beta"],
+        "eta":best_trial.params["eta"],
+        "delta":best_trial.params["delta"]
     }
     best_metrics = best_trial.user_attrs["metrics"]
 
