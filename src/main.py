@@ -19,12 +19,12 @@ from evaluation.curves import eval_full_model_for_lsh_configs
 
 def run_single_bootstrap(raw_data,
                          seed,
-                         num_perm=128,
+                         num_perm=120,
                          lsh_min_PC=0.9):
     
     random.seed(seed)
     np.random.seed(seed)
-    # --- Prepare datasets (this already does a bootstrap split internally) ---
+
     datasets = prepare_datasets(raw_data, seed=seed)
     cleaned_data = datasets["cleaned_all"]
     data_train = datasets["data_train"]
@@ -36,7 +36,6 @@ def run_single_bootstrap(raw_data,
     print("  Train clusters:", len(data_train))
     print("  Test  clusters:", len(data_test))
 
-    # --- LSH on TRAIN: build signatures and tune (b, r) ---
     brand_signatures_train, small_brand_offers_train, _ = build_minhash_for_brands(
         brand_blocks_train, num_perm=num_perm, seed=seed
     )
@@ -68,13 +67,13 @@ def run_single_bootstrap(raw_data,
 
     train_clusters = sorted(set(data_train.keys()))
 
-    # --- MSM tuning on TRAIN ---
+
     best_msm_params, best_msm_metrics = tune_msm_params(
     brand_candidates=brand_candidates_train,
     data=cleaned_data,
     train_cluster_ids=train_clusters,
     n_trials=30, 
-    timeout=3600,       # cap in seconds
+    timeout=3600,   
     gamma_range=(0.3, 0.7),
     epsilon_range=(0.1, 0.4),
     mu_range=(0.5, 0.9),
@@ -88,7 +87,6 @@ def run_single_bootstrap(raw_data,
     print(f"[Bootstrap {seed}] Best MSM params: {best_msm_params}")
     print(f"[Bootstrap {seed}] Train F1: {best_msm_metrics['F1']}")
 
-    # --- Run LSH + MSM on TEST with tuned params ---
     brand_signatures_test, small_brand_offers_test, _ = build_minhash_for_brands(
         brand_blocks_test, num_perm=num_perm, seed=seed
     )
@@ -129,7 +127,7 @@ def run_single_bootstrap(raw_data,
     test_clusters=test_clusters,
     msm_params=best_msm_params,
     num_perm=num_perm,
-    max_delta=2,  # or 1/2/3 depending on how dense you want FC grid
+    max_delta=2,  
     )
 
     return {
@@ -146,15 +144,14 @@ def main(args):
     with open(args.path) as f:
         raw_data = json.load(f)
 
-    #for testing only through main guard
+
     if args.max_clusters is not None:
         raw_data = dict(list(raw_data.items())[:args.max_clusters])
 
 
-    num_perm = 240
+    num_perm = 120
     all_results = []
 
-    # ---- SEQUENTIAL VERSION (fallback / n_jobs_bootstrap=1) ----
     if args.n_jobs_bootstrap == 1:
         for i in range(args.bootstraps):
             seed = args.seed + i
@@ -167,7 +164,6 @@ def main(args):
             )
             all_results.append(res)
 
-    # ---- PARALLEL VERSION ----
     else:
         seeds = [args.seed + i for i in range(args.bootstraps)]
 
@@ -193,7 +189,6 @@ def main(args):
                 )
                 all_results.append(fut.result())
 
-    # ---- Aggregate TEST metrics over bootstraps ----
     if not all_results:
         print("No bootstrap results collected.")
         return
@@ -210,17 +205,14 @@ def main(args):
         print(f"{k}: {v}")
 
 
-
-    # ---- collect all curve points from all bootstraps ----
     all_curve_rows = []
     for res in all_results:
         all_curve_rows.extend(res["curve_points"])
 
     curve_df = pd.DataFrame(all_curve_rows)
 
-    # ---- bin FC into regular intervals, e.g. width 0.05 ----
     bin_width = 0.05
-    bin_edges = np.arange(0.0, 1.0 + bin_width, bin_width)  # [0.0, 0.05, ..., 1.0]
+    bin_edges = np.arange(0.0, 1.0 + bin_width, bin_width)
 
     curve_df["FC_bin"] = pd.cut(
         curve_df["FC"],
@@ -244,46 +236,68 @@ def main(args):
     )
 
     
-    # ---- aggregate per bin ----
     agg = agg.sort_values("FC").reset_index(drop=True)
-    window = 3  # or 5, tuned by eye
+    window = 3 
 
     for col in ["F1", "PQ", "PC", "F1_star"]:
-        agg[col + "_smooth"] = agg[col].rolling(window=window, min_periods=1, center=True).median()
-    # optional: drop bins with very few points (to reduce noise)
-    min_points_per_bin = 0
-    agg = agg[agg["count"] >= min_points_per_bin]
+        agg[col + "_avg"] = agg[col].rolling(window=window, min_periods=1, center=True).median()
 
-    # make sure rows are sorted by FC
     agg = agg.sort_values("FC").reset_index(drop=True)
 
 
     def plot_metric_vs_FC(df, metric, out_dir="graphs"):
         os.makedirs(out_dir, exist_ok=True)
-        df = df.sort_values("FC")  # just to be safe
+        df = df.sort_values("FC")
 
         x = df["FC"]
         y = df[metric]
 
-        plt.figure()
-        plt.plot(x, y, marker="o")
+        plt.figure(figsize=(4.5, 3.0)) 
+
+        plt.plot(
+            x,
+            y,
+            marker="o",
+            markersize=3,
+            linewidth=1.2
+        )
+
         plt.xlabel("Fraction of comparisons (FC)")
         plt.ylabel(metric)
-        plt.title(f"{metric} vs FC")
-        plt.grid(False)
+
+        ax = plt.gca()
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_linewidth(1.0)
+        ax.spines["bottom"].set_linewidth(1.0)
+        ax.yaxis.set_ticks_position("left")
+        ax.xaxis.set_ticks_position("bottom")
+        ax.grid(False)
+
         plt.tight_layout()
-        plt.savefig(os.path.join(out_dir, f"{metric}_vs_FC.png"))
+
+        plt.savefig(
+            os.path.join(out_dir, f"{metric}_vs_FC.eps"),
+            format="eps",
+            bbox_inches="tight"
+        )
+
+        plt.savefig(
+            os.path.join(out_dir, f"{metric}_vs_FC.png"),
+            dpi=300,
+            bbox_inches="tight"
+        )
+
         plt.close()
 
-
-    # note: use the column name "F1_star" here, not "F1*"
-    for metric in ["F1_smooth", "F1", "PQ", "PC", "F1_star"]:
+    for metric in ["F1_avg", "F1_star_avg", "PQ_avg", "PC_avg", "F1", "PQ", "PC", "F1_star"]:
         plot_metric_vs_FC(agg, metric)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", default="data/TVs-all-merged.json")
-    parser.add_argument("--bootstraps", type=int, default=7,
+    parser.add_argument("--bootstraps", type=int, default=21,
                         help="Number of bootstrap repetitions.")
     parser.add_argument("--seed", type=int, default=123,
                         help="Base random seed.")
@@ -300,5 +314,3 @@ if __name__ == "__main__":
 
     elapsed = end - start
     print(f"\n===== TOTAL WALL-CLOCK RUNTIME: {elapsed/60:.2f} minutes ({elapsed:.1f} seconds) =====")
-
-# python src/main.py --path data/TVs-all-merged.json --bootstraps 3 --max_clusters 400 --n_jobs_bootstrap 3

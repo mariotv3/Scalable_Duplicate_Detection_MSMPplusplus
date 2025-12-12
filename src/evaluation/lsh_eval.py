@@ -65,8 +65,6 @@ def evaluate_lsh_global(brand_signatures, data, b, r):
 
     F1_star = 2 * PQ * PC / (PQ + PC) if (PQ + PC) else 0.0
 
-    #print(f"(b,r): ({b},{r}), FC: {FC}, PC: {PC}, PQ: {PQ}")
-    #print("total pssible / global total possible", total_possible/global_total_possible)
     return {
         "TP": total_tp,
         "total_true": total_true,

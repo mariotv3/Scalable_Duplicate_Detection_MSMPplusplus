@@ -37,7 +37,6 @@ def eval_full_model_for_lsh_configs(
             if b * r != k_eff:
                 continue
 
-            # --- Build a k_eff-sliced version of brand_signatures ---
             brand_sigs_k: Dict[str, Tuple[List[str], np.ndarray]] = {}
             for brand, (offer_ids, sigs) in brand_signatures_test.items():
                 if sigs.shape[0] < k_eff:
@@ -47,7 +46,6 @@ def eval_full_model_for_lsh_configs(
             if not brand_sigs_k:
                 continue
 
-            # --- LSH evaluation for this config ---
             lsh_metrics = evaluate_lsh_global(
                 brand_signatures=brand_sigs_k,
                 data=cleaned_data,
@@ -59,7 +57,7 @@ def eval_full_model_for_lsh_configs(
             PC = lsh_metrics["PC"]
             F1_star = lsh_metrics["F1*"]
 
-            # --- Build candidate pairs for this LSH config ---
+        
             brand_lsh_candidates = run_lsh_for_all_brands(
                 brand_sigs_k,
                 b=b,
@@ -73,10 +71,8 @@ def eval_full_model_for_lsh_configs(
                 **small_brand_candidates,
             }
 
-            # # numerator: all candidate pairs across all brands
             total_cand = sum(len(pairs) for pairs in brand_candidates.values())
 
-            # denominator: all possible pairs per brand, summed
             total_possible = 0
 
             for brand, (offer_ids, _) in brand_sigs_k.items():
@@ -91,7 +87,6 @@ def eval_full_model_for_lsh_configs(
 
             FC = total_cand / total_possible if total_possible > 0 else 0.0
 
-            # --- Run MSM with *fixed* params on these candidates ---
             msm_metrics = run_msm_and_evaluate(
                 brand_candidates=brand_candidates,
                 data=cleaned_data,
@@ -119,11 +114,9 @@ def eval_full_model_for_lsh_configs(
                 }
             )
 
-    # append a row to rows with the results for the msm run with all possible pairups within each brand in the test set (FC=1)
-    # Build full candidate set: all pairs within each brand
     full_brand_candidates: Dict[str, List[Tuple[str, str]]] = {}
 
-    # "Big" brands (those with signatures)
+
     for brand, (offer_ids, _) in brand_signatures_test.items():
         n = len(offer_ids)
         if n < 2:
@@ -134,7 +127,7 @@ def eval_full_model_for_lsh_configs(
                 pairs.append((offer_ids[i], offer_ids[j]))
         full_brand_candidates[brand] = pairs
 
-    # "Small" brands
+
     for brand, items in small_brand_offers_test.items():
         offer_ids = [oid for oid, _ in items]
         n = len(offer_ids)
@@ -149,7 +142,6 @@ def eval_full_model_for_lsh_configs(
         else:
             full_brand_candidates[brand] = pairs
 
-    # By construction this is all possible within-brand pairs → FC = 1.0
     msm_metrics_full = run_msm_and_evaluate(
         brand_candidates=full_brand_candidates,
         data=cleaned_data,
@@ -165,12 +157,10 @@ def eval_full_model_for_lsh_configs(
 
     rows.append(
         {
-            "k_eff": None,   # no LSH here
+            "k_eff": None, 
             "b": None,
             "r": None,
             "FC": 1.0,
-            # LSH metrics are not really defined when you don't use LSH;
-            # you can keep them as NaN and only use F1 for the FC=1 point.
             "PQ": 0.0001,
             "PC": 1.0,
             "F1*": 0.0001,

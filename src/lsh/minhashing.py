@@ -68,8 +68,8 @@ def process_brand_block(
     A: np.ndarray,
     B: np.ndarray,
     P: int,
-    max_df_frac: float = 0.5,  # drop shingles present in >50% of offers
-    min_df: int = 2,           # drop shingles seen in fewer than 2 offers
+    max_df_frac: float = 0.5,  
+    min_df: int = 2,          
 ) -> Tuple[List[str], np.ndarray]:
 
  
@@ -118,7 +118,7 @@ def build_minhash_for_brands(
     brand_blocks: Dict[str, List[Tuple[str, dict]]],
     num_perm: int = 128,
     seed: int = 123,
-    min_offers_for_lsh: int = 0,
+    min_offers_for_lsh: int = 4,
 ):
     rng = np.random.default_rng(seed)
     A = rng.integers(1, PRIME_32, size=num_perm, dtype=np.uint32)

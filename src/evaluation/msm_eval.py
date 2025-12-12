@@ -5,7 +5,6 @@ from optuna.samplers import TPESampler
 
 from msm.msm import msm_for_all_brands, clusters_to_pairs_by_brand
 
-#optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 def get_model_id(offer_id, data):
     cid, idx = offer_id.split("#", 1)

@@ -1,2 +1,17 @@
+# Python cache
 __pycache__/
-*.py[cod]
+*.pyc
+
+# Ignore graphs but keep folder
+graphs/*
+!graphs/.gitkeep
+
+# Ignore debugging scripts
+**/debugging*
+
+# Ignore all PNG files everywhere
+*.png
+
+# Virtual environments
+ml_env/
+.venv/

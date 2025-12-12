@@ -7,6 +7,14 @@ import pandas as pd
 from sklearn.cluster import AgglomerativeClustering
 from ordered_set import OrderedSet
 
+INCH_REGEX = re.compile(
+    r'(?<!\d)(\d{2,3}(?:\.\d+)?)\s*(?:inches|inch|in\b|["”])',
+    re.IGNORECASE
+)
+
+STRONG_MW = re.compile(r"(?i)^(?=.*[a-z])(?=.*\d)(?!.*(inch|hz|p)$)[a-z0-9-]{6,}$")
+
+
 
 def generate_small_brand_candidate_pairs(small_brand_offers):
     small_brand_candidates = {}
@@ -162,6 +170,35 @@ def same_resolution(product_1, product_2, debug=False):
             product_1_reso == "NA" or
             product_2_reso == "NA")
 
+def extract_size_inches(product: dict) -> float | None:
+    # Prefer title
+    title = str(product.get("title") or "")
+    m = INCH_REGEX.search(title)
+    if m:
+        try:
+            return float(m.group(1))
+        except ValueError:
+            pass
+
+    fm = product.get("featuresMap") or {}
+    for k, v in fm.items():
+        ks = str(k).lower()
+        if any(tok in ks for tok in ["size", "screen", "diagonal"]):
+            m = INCH_REGEX.search(str(v))
+            if m:
+                try:
+                    return float(m.group(1))
+                except ValueError:
+                    pass
+    return "NA"
+
+def same_size(product1, product2):
+    s1 = extract_size_inches(product1)
+    s2 = extract_size_inches(product2)
+
+    return (s1==s2 or
+            s1 == "NA" or
+            s2 == "NA")
 
 def extract_model_words(features, keys):
     key_words_regex = r'^\d+\.\d+|\b\d+:\d+\b|(?<!\S)\d{3,}\s*[x]\s*\d{3,}(?!\S)'
@@ -174,20 +211,48 @@ def extract_model_words(features, keys):
 
     return model_words
 
+def strong_model_word(title_1, title_2):
+    title_regex = r'([a-zA-Z0-9]*((\d*\.)?\d+[^0-9, ]+)[a-zA-Z0-9]*)'
+    model_words_1 = OrderedSet()
+    model_words_2 = OrderedSet()
+
+    model_words_1.update(x[0] for x in re.findall(title_regex, title_1))
+    model_words_2.update(x[0] for x in re.findall(title_regex, title_2))
+
+    strong_1 = {w.lower() for w in model_words_1 if STRONG_MW.match(w)}
+    strong_2 = {w.lower() for w in model_words_2 if STRONG_MW.match(w)}
+
+    if strong_1 and strong_2 and not (strong_1 & strong_2):
+        return False
+
+    if strong_1 & strong_2:
+        return True
+    
+    return False
 
 def title_comp(title_1, title_2, alpha, beta, delta, eta):
-    title_regex = r'([a-zA-Z0-9]*((\d*\.)?\d+[^0-9, ]+)[a-zA-Z0-9]*)'
+    title_regex = r'([a-zA-Z0-9]*((\d*\.)?\d+[^0-9, ]+)[a-zA-Z0-9]*)' 
 
+    if strong_model_word(title_1, title_2):
+        return 1.0
+    
     name_cosine_sim = cosineSim(title_1, title_2)
-
-    if name_cosine_sim > alpha:
-        return 1
 
     model_words_1 = OrderedSet()
     model_words_2 = OrderedSet()
 
     model_words_1.update(x[0] for x in re.findall(title_regex, title_1))
     model_words_2.update(x[0] for x in re.findall(title_regex, title_2))
+
+    strong_1 = {w.lower() for w in model_words_1 if STRONG_MW.match(w)}
+    strong_2 = {w.lower() for w in model_words_2 if STRONG_MW.match(w)}
+
+    if strong_1 and strong_2 and not (strong_1 & strong_2):
+        return -1.0
+
+    if name_cosine_sim > alpha:
+        return 1.0
+    
 
     similar_model_words = False
 
@@ -228,12 +293,16 @@ def msm_pair_dissimilarity(product_1,
                            gamma,
                            mu,
                            alpha):
+    
+    if not strong_model_word(product_1.get("title", ""), product_2.get("title", ""),):
+        if same_shop(product_1, product_2, debug=False):
+            return 1.0
 
-    if same_shop(product_1, product_2, debug=False):
-        return 1.0
-
-    if not same_resolution(product_1, product_2, debug=False):
-        return 1.0
+        if not same_resolution(product_1, product_2, debug=False):
+            return 1.0
+        
+        if not same_size(product_1, product_2):
+            return 1.0
 
     sim = 0.0
     mean_sim = 0.0
@@ -275,7 +344,7 @@ def msm_pair_dissimilarity(product_1,
     mw_percentage = 0.0 if union_len == 0 else len(
         model_words_1.intersection(model_words_2)
     ) / union_len
-
+    
     title_sim = title_comp(
         product_1.get("title", ""),
         product_2.get("title", ""),
@@ -329,7 +398,7 @@ def msm_clustering_for_brand(
             p1, p2, beta=beta, delta = delta, eta=eta, gamma=gamma, mu=mu, alpha=alpha
         )
         if d > 0.4:
-            d = 1.0
+            d = 1
         dissimilarity.loc[oid1, oid2] = d
         dissimilarity.loc[oid2, oid1] = d
 
@@ -379,11 +448,27 @@ def msm_for_all_brands(
             delta=delta,
             eta=eta
         )
+        clean_clusters = []
+        for cluster in clusters:
+            if len(cluster) < 2:
+                continue
+
+            if has_forbidden_pair(cluster, dissim):
+                for oid in cluster:
+                    clean_clusters.append([oid])
+            else:
+                clean_clusters.append(cluster)
         clusters_by_brand[brand] = clusters
         dissim_by_brand[brand] = dissim
 
     return clusters_by_brand, dissim_by_brand
 
+def has_forbidden_pair(cluster, dissim, cutoff=1.0):
+    for i in range(len(cluster)):
+        for j in range(i + 1, len(cluster)):
+            if dissim.loc[cluster[i], cluster[j]] >= cutoff:
+                return True
+    return False
 
 def clusters_to_pairs_by_brand(clusters_by_brand):
     brand_pairs = {}

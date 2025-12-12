@@ -7,6 +7,46 @@ TRAILING_SUFFIXES = {
     "tv", "electronics", "inc", "inc.", "corp", "corporation", "company", "co"
 }
 
+CLEAN_MAP_MW = {
+    "inch ": [
+        "inches", "inch", "\"", "”", "'", "-inch"
+    ],
+    "hz ": [
+        "hertz", "hz", "hz."
+    ],
+    "lb ": [
+        "pounds", "pound", "lbs.", "lbs", "lb.", "lb"
+    ],
+    "kg ": [
+        "kg.", "kg", "kgs", "kilograms", "kilogram", "kg)", "kg )", "Kg", "Kg.", "Kgs"
+    ],
+    "w ": [
+        "watts", "watt", "w.", "w"
+    ],
+    "cd/m2 ": [
+        "cd/mÂ²", "cd/m²", "cd/m2", "cd / m2", "cd / mÂ²", "cd / m²"
+    ],
+    "deg ": [
+        "°", "º", "&#176;", "degrees", "degree"
+    ],
+}
+
+CLEAN_MAP_TITLE_EXTRA = {
+    " ": [
+        "and", "or", "-", ",", "/", "&",
+        "refurbished", "diagonal", "diag.",
+        "best buy", "thenerds.net", "newegg.com",
+    ]
+}
+
+CLEAN_MAP_TITLE = {**CLEAN_MAP_MW, **CLEAN_MAP_TITLE_EXTRA}
+
+NUMERIC_VALUE_PATTERN = re.compile(
+    r"\d+(?:\.\d+)?[a-zA-Z]+|\d+(?:\.\d+)?"
+)
+
+MODEL_WORD_PATTERN = re.compile(r"\b(?=\w*[a-zA-Z])(?=\w*\d)[a-zA-Z0-9-]+\b")
+
 def normalize_brand(raw):
     if not raw or not isinstance(raw, str):
         return "unknown"
@@ -118,40 +158,6 @@ def annotate_offers_with_brand(data):
             offer["brand"] = brand
     return data
 
-CLEAN_MAP_MW = {
-    "inch ": [
-        "inches", "inch", "\"", "”", "'", "-inch"
-    ],
-    "hz ": [
-        "hertz", "hz", "hz."
-    ],
-    "lb ": [
-        "pounds", "pound", "lbs.", "lbs", "lb.", "lb"
-    ],
-    "kg ": [
-        "kg.", "kg", "kgs", "kilograms", "kilogram", "kg)", "kg )", "Kg", "Kg.", "Kgs"
-    ],
-    "w ": [
-        "watts", "watt", "w.", "w"
-    ],
-    "cd/m2 ": [
-        "cd/mÂ²", "cd/m²", "cd/m2", "cd / m2", "cd / mÂ²", "cd / m²"
-    ],
-    "deg ": [
-        "°", "º", "&#176;", "degrees", "degree"
-    ],
-}
-
-CLEAN_MAP_TITLE_EXTRA = {
-    " ": [
-        "and", "or", "-", ",", "/", "&",
-        "refurbished", "diagonal", "diag.",
-        "best buy", "thenerds.net", "newegg.com",
-    ]
-}
-
-CLEAN_MAP_TITLE = {**CLEAN_MAP_MW, **CLEAN_MAP_TITLE_EXTRA}
-
 def build_regex_rules(clean_map):
     rules = []
     for replacement, permutations in clean_map.items():
@@ -198,10 +204,6 @@ def clean_data_optimized(data):
         else:
             cleaned_data_non_duplicates[name] = cleaned_product
     return cleaned_data_duplicates, cleaned_data_non_duplicates
-
-NUMERIC_VALUE_PATTERN = re.compile(
-    r"\d+(?:\.\d+)?[a-zA-Z]+|\d+(?:\.\d+)?"
-)
 
 def extract_numeric_tokens_from_text(text: str):
     if not text:
@@ -256,8 +258,6 @@ def keep_only_features_brand_and_title(data):
             offer["featuresMap"] = features_map
             offer["brand"] = brand
     return data
-# r"\b(?=\w*\d)[a-zA-Z0-9-]+\b"
-MODEL_WORD_PATTERN = re.compile(r"\b(?=\w*[a-zA-Z])(?=\w*\d)[a-zA-Z0-9-]+\b")
 
 def extract_title_model_words(title: str):
     if not isinstance(title, str):
@@ -311,34 +311,3 @@ def prepare_datasets(raw_data, seed=123):
         "brand_blocks_test": brand_blocks_test,
         "known_brands": known_brands,
     }
-
-# For testing
-def run(data):
-    data = annotate_offers_with_brand(copy.deepcopy(data))
-
-    cleaned_dups, cleaned_single = clean_data_optimized(data)
-    rng = np.random.default_rng(123)
-    dups_train, dups_test = bootstrap_split_clusters(cleaned_dups, rng=rng)
-    singles_train, singles_test = bootstrap_split_clusters(cleaned_single, rng=rng)
-
-    train = {**dups_train, **singles_train}
-    test  = {**dups_test,  **singles_test}
-
-    brands_train, _ = group_offers_by_brand(train)
-    brands_test, _  = group_offers_by_brand(test)
-
-    return train, test, set(brands_train.keys()), set(brands_test.keys())
-
-# Main guard
-if __name__ == "__main__":
-    import argparse, json
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--path", required=True)
-    args = parser.parse_args()
-
-    with open(args.path) as f:
-        data = json.load(f)
-
-    train, test, brands_train, brands_test = run(data)
-    print("Train clusters:", len(train))
-    print("Test clusters:", len(test))
