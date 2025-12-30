@@ -9,7 +9,7 @@ This repository contains the code for **Branded Multi-Component Similarity Metho
 - **msm/msm.py** (hard blocks + composite similarity for final clustering)
 - **main.py** (Scripts to reproduce evaluation plots (FC vs metrics))
 
-## Repository structure (suggested)
+## Repository structure
 - `src/` : implementation (cleaning, shingling, minhash, LSH, MSM, evaluation)
 - `data/` : input data (if included) or loaders
 - `graphs/` : generated plots (not tracked; keep folder via `.gitkeep`)
